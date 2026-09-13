@@ -243,6 +243,36 @@ async fn settings_and_stats_queries() {
     assert_eq!(stats.total_answered, 15);
     assert_eq!(stats.played_games, 2);
 
+    // 到限中断的部分回合（题数 <5）保留在记录表，但不进入成就类统计
+    sqlx::query(
+        "INSERT INTO GameRecord (profile_id, game_type, level, correct, total, accuracy, stars_earned)
+         VALUES (?1,'fishing',1,2,3,0.667,0)",
+    )
+    .bind(p.id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let stats2: Stats = sqlx::query_as(
+        "SELECT COUNT(*) AS rounds,
+                COALESCE(SUM(correct), 0) AS total_correct,
+                COALESCE(SUM(total), 0)   AS total_answered,
+                COUNT(DISTINCT game_type) AS played_games
+         FROM GameRecord WHERE profile_id = ?1 AND total BETWEEN 5 AND 10",
+    )
+    .bind(p.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(stats2.rounds, 3);
+    assert_eq!(stats2.total_answered, 15);
+    // 但记录仍可在家长查看的完整列表中看到
+    let all: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM GameRecord WHERE profile_id = ?1")
+        .bind(p.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(all.0, 4);
+
     // list_items 风格查询：装扮字段默认空
     let row: (Option<String>, Option<String>, Option<String>, Option<String>) =
         sqlx::query_as(
@@ -254,4 +284,70 @@ async fn settings_and_stats_queries() {
         .await
         .unwrap();
     assert_eq!(row, (None, None, None, None));
+}
+
+/// 今日报告聚合 + 乘除法占位游戏不计入「玩遍六种游戏」
+#[tokio::test]
+async fn daily_report_and_multiply_exclusion() {
+    let pool = temp_pool().await;
+    let p = insert_profile(&pool, "己", "2021-06-06", "rabbit").await;
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let old = "2000-01-01 10:00:00";
+
+    // 今天：fishing 两回合、multiply 一回合（占位，含部分回合也应出现在报告里）
+    sqlx::query(
+        "INSERT INTO GameRecord
+           (profile_id, game_type, level, correct, total, accuracy, stars_earned, played_at)
+         VALUES (?1,'fishing',1,5,5,1.0,2, datetime('now','localtime')),
+                (?1,'fishing',2,4,5,0.8,1, datetime('now','localtime')),
+                (?1,'multiply',1,2,3,0.667,0, datetime('now','localtime')),
+                (?1,'clock',1,5,5,1.0,2, ?2)",
+    )
+    .bind(p.id)
+    .bind(old)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // 与 get_daily_report 相同的查询
+    let report: Vec<DailyReportRow> = sqlx::query_as(
+        "SELECT game_type,
+                COUNT(*) AS rounds,
+                COALESCE(SUM(correct), 0) AS correct,
+                COALESCE(SUM(total), 0) AS total,
+                COALESCE(SUM(stars_earned), 0) AS stars
+         FROM GameRecord
+         WHERE profile_id = ?1 AND substr(played_at, 1, 10) = ?2
+         GROUP BY game_type
+         ORDER BY rounds DESC",
+    )
+    .bind(p.id)
+    .bind(&today)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+
+    // 今天只有 fishing 与 multiply 两个分组（昨天的 clock 不算）
+    assert_eq!(report.len(), 2);
+    let fishing = report.iter().find(|r| r.game_type == "fishing").unwrap();
+    assert_eq!((fishing.rounds, fishing.correct, fishing.total, fishing.stars), (2, 9, 10, 3));
+    let multiply = report.iter().find(|r| r.game_type == "multiply").unwrap();
+    assert_eq!((multiply.rounds, multiply.total), (1, 3));
+
+    // get_stats：multiply 不计入 played_games；部分回合(total=3)不计入成就统计
+    let stats: Stats = sqlx::query_as(
+        "SELECT COUNT(*) AS rounds,
+                COALESCE(SUM(correct), 0) AS total_correct,
+                COALESCE(SUM(total), 0)   AS total_answered,
+                COUNT(DISTINCT CASE WHEN game_type <> 'multiply' THEN game_type END) AS played_games
+         FROM GameRecord WHERE profile_id = ?1 AND total BETWEEN 5 AND 10",
+    )
+    .bind(p.id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    // 完整回合：fishing×2 + clock×1 = 3；multiply 的 3 题部分回合排除
+    assert_eq!(stats.rounds, 3);
+    // 主游戏种类只统计 fishing（昨天的 clock 仍算玩过，played_games 不限日期）
+    assert_eq!(stats.played_games, 2);
 }

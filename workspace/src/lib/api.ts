@@ -94,4 +94,10 @@ export const api = {
     invoke<void>("add_play_seconds", { profileId, seconds }),
   getTodayUsage: (profileId: number) =>
     invoke<number>("get_today_usage", { profileId }),
+
+  // 今日报告
+  getDailyReport: (profileId: number) =>
+    invoke<import("../types").DailyReportRow[]>("get_daily_report", { profileId }),
+  exportDailyReport: (profileId: number) =>
+    invoke<string>("export_daily_report", { profileId }),
 };

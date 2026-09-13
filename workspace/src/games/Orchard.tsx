@@ -26,13 +26,13 @@ function boundsFor(level: number) {
   // 10 以内起步，高 Level 到 20 以内
   switch (level) {
     case 1:
-      return { max: 5, ops: ["+"] as ("+" | "-")[] };
+      return { max: 10, ops: ["+"] as ("+" | "-")[] };
     case 2:
       return { max: 10, ops: ["+", "-"] as ("+" | "-")[] };
     case 3:
-      return { max: 10, ops: ["+", "-"] as ("+" | "-")[] };
-    case 4:
       return { max: 15, ops: ["+", "-"] as ("+" | "-")[] };
+    case 4:
+      return { max: 20, ops: ["+", "-"] as ("+" | "-")[] };
     default:
       return { max: 20, ops: ["+", "-"] as ("+" | "-")[] };
   }
@@ -79,12 +79,14 @@ export function buildQuestions(level: number): OrchardQ[] {
 export default function Orchard({
   level,
   onDone,
+  onProgress,
 }: {
   level: number;
   onDone: (c: number, t: number) => void;
+  onProgress?: (p: import("./useRound").RoundProgress) => void;
 }) {
   const questions = useMemo(() => buildQuestions(level), [level]);
-  const { idx, correct, locked, submit, total } = useRound(questions, onDone);
+  const { idx, correct, locked, submit, total } = useRound(questions, onDone, onProgress);
   const q = questions[idx];
   const fb = useFeedback();
 

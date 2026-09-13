@@ -4,7 +4,8 @@ export type GameType =
   | "orchard"
   | "shapes"
   | "patterns"
-  | "clock";
+  | "clock"
+  | "multiply";
 
 export interface Profile {
   id: number;
@@ -60,6 +61,14 @@ export interface ItemState {
 export interface SettingsView {
   daily_limit_minutes: number;
   pin_is_default: boolean;
+}
+
+export interface DailyReportRow {
+  game_type: GameType;
+  rounds: number;
+  correct: number;
+  total: number;
+  stars: number;
 }
 
 /** 一回合结算载荷（路由 state / 本地缓存） */

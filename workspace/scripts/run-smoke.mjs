@@ -8,7 +8,11 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const out = mkdtempSync(join(tmpdir(), "kidmath-test-"));
-const entries = ["scripts/smoke-logic.mjs", "scripts/smoke-games.mjs"];
+const entries = [
+  "scripts/smoke-logic.mjs",
+  "scripts/smoke-games.mjs",
+  "scripts/smoke-achievements.mjs",
+];
 
 await build({
   entryPoints: entries,

@@ -449,6 +449,13 @@ button {
   padding: 10px 20px;
   font-size: 20px;
   font-weight: 700;
+  font-family: inherit;
+}
+button.soon-tag {
+  transition: transform 0.12s ease;
+}
+button.soon-tag:active {
+  transform: scale(0.94);
 }
 .soon-label {
   font-size: 22px;
@@ -912,6 +919,31 @@ button {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+.tryon-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 10px 0 4px;
+  position: relative;
+}
+.tryon-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.tryon-tip {
+  position: absolute;
+  bottom: -14px;
+  right: 28px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  padding: 4px 16px;
+  border-radius: 999px;
+  animation: pop 0.3s ease;
 }
 .gallery-scroll {
   flex: 1;

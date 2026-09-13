@@ -64,12 +64,14 @@ export function buildQuestions(level: number): FishQ[] {
 export default function Fishing({
   level,
   onDone,
+  onProgress,
 }: {
   level: number;
   onDone: (c: number, t: number) => void;
+  onProgress?: (p: import("./useRound").RoundProgress) => void;
 }) {
   const questions = useMemo(() => buildQuestions(level), [level]);
-  const { idx, correct, locked, submit, total } = useRound(questions, onDone);
+  const { idx, correct, locked, submit, total } = useRound(questions, onDone, onProgress);
   const q = questions[idx];
   const [caught, setCaught] = useState<boolean[]>(() => q.fish.map(() => false));
   const [caughtCount, setCaughtCount] = useState(0);

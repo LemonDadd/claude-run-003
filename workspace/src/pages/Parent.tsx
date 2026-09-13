@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PinPad from "../components/PinPad";
+import DailyReport from "../components/DailyReport";
 import { api } from "../lib/api";
 import {
   ACHIEVEMENTS,
   GAMES,
+  WIP_GAMES,
   ageFromBirthday,
   effectiveLevel,
 } from "../lib/gameConfig";
@@ -89,6 +91,9 @@ function Panel({
 
   return (
     <div className="parent-grid">
+      {/* 今日报告：一键导出 Markdown */}
+      <DailyReport profiles={profiles} />
+
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         {/* PIN 修改 */}
         <div className="card">
@@ -366,12 +371,13 @@ function ChildCard({ profileId, pin }: { profileId: number; pin: string }) {
           </tr>
         </thead>
         <tbody>
-          {GAMES.map((g) => {
+          {[...GAMES, ...WIP_GAMES].map((g) => {
             const d = perGame.get(g.type);
             return (
               <tr key={g.type}>
                 <td>
                   {g.emoji} {g.name}
+                  {g.wip ? "（试玩）" : ""}
                 </td>
                 <td>{d?.rounds ?? 0}</td>
                 <td>{d ? `${d.best}%` : "—"}</td>

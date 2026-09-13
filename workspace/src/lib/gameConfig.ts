@@ -6,6 +6,10 @@ export const GAMES: {
   emoji: string;
   color: string;
   desc: string;
+  /** 占位中的游戏（乘除法先行版），不计入「玩遍六种游戏」成就 */
+  wip?: boolean;
+  /** 该游戏支持的最高难度（占位游戏只有 3 级） */
+  maxLevel?: number;
 }[] = [
   {
     type: "fishing",
@@ -51,7 +55,21 @@ export const GAMES: {
   },
 ];
 
-export const COMING_SOON = ["✖️ 乘除法", "➗ 分数", "💰 货币认知", "🔢 数独"];
+/** 占位中的游戏：乘除法先行版（平均分），只有 3 个难度，不计入六种主游戏 */
+export const WIP_GAMES: (typeof GAMES)[number][] = [
+  {
+    type: "multiply",
+    name: "乘除法·分苹果",
+    emoji: "🍎",
+    color: "#f472b6",
+    desc: "把苹果平均分一分（试玩版）",
+    wip: true,
+    maxLevel: 3,
+  },
+];
+
+/** 真正"即将推出"、尚不可玩的内容 */
+export const COMING_SOON = ["➗ 分数", "💰 货币认知", "🔢 数独"];
 
 export const ACHIEVEMENTS: AchievementDef[] = [
   // 坚持类

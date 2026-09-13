@@ -1,11 +1,12 @@
-// 六个游戏出题器的不变量冒烟测试（esbuild 打包后在 node 运行，不渲染组件）
+// 六个主游戏 + 乘除法占位版的出题器不变量冒烟测试（不渲染组件）
 import { buildQuestions as fishQ } from "../src/games/Fishing.tsx";
 import { buildQuestions as compareQ } from "../src/games/Compare.tsx";
 import { buildQuestions as orchardQ } from "../src/games/Orchard.tsx";
 import { buildQuestions as shapesQ } from "../src/games/ShapesGame.tsx";
 import { buildQuestions as patternsQ } from "../src/games/Patterns.tsx";
 import { buildQuestions as clockQ } from "../src/games/ClockGame.tsx";
-import { QUESTION_COUNT } from "../src/lib/gameConfig.ts";
+import { buildQuestions as multiplyQ } from "../src/games/MultiplyGame.tsx";
+import { QUESTION_COUNT, GAMES, WIP_GAMES } from "../src/lib/gameConfig.ts";
 
 let passed = 0;
 function assert(cond, msg) {
@@ -37,19 +38,29 @@ for (let level = 1; level <= 5; level++) {
   // 果园
   const o = orchardQ(level);
   assert(o.length === n, `Lv${level} 果园题数=${n}`);
-  const maxBound = [5, 10, 10, 15, 20][level - 1];
+  const maxBound = [10, 10, 15, 20, 20][level - 1];
+  let plusCount = 0;
   for (const q of o) {
+    if (q.op === "+") plusCount++;
     assert(q.choices.includes(q.answer), `Lv${level} 果园选项含答案`);
     assert(new Set(q.choices).size === 4, `Lv${level} 果园 4 个不同选项`);
     assert(q.answer >= 0, `Lv${level} 果园答案非负`);
     if (q.op === "+") {
-      assert(level !== 1 || q.base + q.delta <= 5, `Lv1 加法在 5 以内`);
+      assert(q.base + q.delta <= maxBound, `Lv${level} 加法在 ${maxBound} 以内`);
+      if (level === 1) {
+        assert(q.base + q.delta <= 10, `Lv1 加法结果在 10 以内`);
+        assert(q.base + q.delta >= 2, `Lv1 加法至少为 2`);
+      }
       assert(q.base + q.delta === q.answer, `加法答案正确`);
     } else {
       assert(level >= 2, `Lv1 不出减法`);
       assert(q.base - q.delta === q.answer && q.delta < q.base, `减法答案正确且够减`);
     }
     assert(Math.max(q.base, q.answer) <= maxBound, `Lv${level} 果园数字在 ${maxBound} 以内`);
+  }
+  if (level === 1) {
+    assert(plusCount === o.length, `Lv1 果园只出加法`);
+    assert(o.every((q) => q.base + q.delta <= 10), `Lv1 加法结果均在 10 以内`);
   }
 
   // 图形配对
@@ -103,6 +114,27 @@ for (let level = 1; level <= 5; level++) {
   }
 }
 
+// 乘除法占位版：只有 3 个难度，「N 个苹果分 M 组」必须整除
+for (let level = 1; level <= 3; level++) {
+  const m = multiplyQ(level);
+  const n = QUESTION_COUNT[level];
+  assert(m.length === n, `乘除法 Lv${level} 题数=${n}`);
+  const maxGroups = [3, 5, 6][level - 1];
+  const maxEach = [4, 6, 8][level - 1];
+  for (const q of m) {
+    assert(q.groups >= 2 && q.groups <= maxGroups, `乘除法 Lv${level} 组数范围正确`);
+    assert(q.answer >= 1 && q.answer <= maxEach, `乘除法 Lv${level} 每组数范围正确`);
+    assert(q.total === q.groups * q.answer, `乘除法 总数 = 组数×每组（整除）`);
+    assert(q.choices.includes(q.answer), `乘除法 选项含正确答案`);
+    assert(new Set(q.choices).size === 4, `乘除法 4 个不同选项`);
+    assert(q.choices.every((c) => c >= 1), `乘除法 选项为正整数`);
+  }
+}
+
+// 占位游戏标记与难度上限
+assert(WIP_GAMES.some((g) => g.type === "multiply" && g.wip && g.maxLevel === 3), "乘除法为 wip 且 maxLevel=3");
+assert(GAMES.length === 6, "主游戏仍为 6 种（乘除法不计入）");
+
 /** 找出 seq 的最小重复周期 */
 function findUnit(seq) {
   for (let u = 1; u <= seq.length; u++) {
@@ -111,4 +143,4 @@ function findUnit(seq) {
   return seq.length;
 }
 
-console.log(`\n六个游戏 × 5 个等级出题器全部通过：${passed} 项断言`);
+console.log(`\n游戏出题器全部通过：${passed} 项断言（六主游戏 ×5 级 + 乘除法 ×3 级）`);

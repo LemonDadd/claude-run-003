@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../store/useStore";
-import { GAMES } from "../lib/gameConfig";
+import { GAMES, WIP_GAMES } from "../lib/gameConfig";
 import { ITEM_CATALOG } from "../lib/items";
 import { playFanfare, playStar } from "../lib/feedback";
 
@@ -22,7 +22,7 @@ export default function Reward() {
   }, []);
 
   const game = useMemo(
-    () => GAMES.find((g) => g.type === lastRound?.gameType),
+    () => [...GAMES, ...WIP_GAMES].find((g) => g.type === lastRound?.gameType),
     [lastRound]
   );
 

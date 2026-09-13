@@ -48,12 +48,14 @@ function timeText(hour: number, half: boolean) {
 export default function ClockGame({
   level,
   onDone,
+  onProgress,
 }: {
   level: number;
   onDone: (c: number, t: number) => void;
+  onProgress?: (p: import("./useRound").RoundProgress) => void;
 }) {
   const questions = useMemo(() => buildQuestions(level), [level]);
-  const { idx, correct, locked, submit, total } = useRound(questions, onDone);
+  const { idx, correct, locked, submit, total } = useRound(questions, onDone, onProgress);
   const q = questions[idx];
   const fb = useFeedback();
 

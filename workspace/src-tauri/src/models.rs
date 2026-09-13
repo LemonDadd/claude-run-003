@@ -65,6 +65,16 @@ pub struct Stats {
     pub played_games: i64,
 }
 
+/// 今日报告中单个游戏的汇总
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DailyReportRow {
+    pub game_type: String,
+    pub rounds: i64,
+    pub correct: i64,
+    pub total: i64,
+    pub stars: i64,
+}
+
 /// 保存一回合游戏结果的入参
 #[derive(Debug, Deserialize)]
 pub struct GameResultInput {

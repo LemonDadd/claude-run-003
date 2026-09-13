@@ -2,6 +2,7 @@ use crate::models::*;
 use chrono::Local;
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
+use tauri::{AppHandle, Manager};
 use tauri::State;
 
 type CmdResult<T> = Result<T, String>;
@@ -229,12 +230,14 @@ pub async fn list_records(
 
 #[tauri::command]
 pub async fn get_stats(state: State<'_, SqlitePool>, profile_id: i64) -> CmdResult<Stats> {
+    // 仅统计完整回合（每回合 5-10 题）；到限中断的部分回合不计入成就类统计。
+    // multiply 为乘除法占位试玩版，不计入「玩遍六种游戏」played_games。
     sqlx::query_as::<_, Stats>(
         "SELECT COUNT(*) AS rounds,
                 COALESCE(SUM(correct), 0) AS total_correct,
                 COALESCE(SUM(total), 0)   AS total_answered,
-                COUNT(DISTINCT game_type) AS played_games
-         FROM GameRecord WHERE profile_id = ?1",
+                COUNT(DISTINCT CASE WHEN game_type <> 'multiply' THEN game_type END) AS played_games
+         FROM GameRecord WHERE profile_id = ?1 AND total BETWEEN 5 AND 10",
     )
     .bind(profile_id)
     .fetch_one(state.inner())
@@ -480,4 +483,158 @@ pub async fn get_today_usage(
             .await
             .map_err(|e| e.to_string())?;
     Ok(row.map(|r| r.0).unwrap_or(0))
+}
+
+/* --------------------------- 今日报告 / 导出 --------------------------- */
+
+/// 查询某孩子今日各游戏汇总（含部分回合，家长可看到中断记录）
+#[tauri::command]
+pub async fn get_daily_report(
+    state: State<'_, SqlitePool>,
+    profile_id: i64,
+) -> CmdResult<Vec<DailyReportRow>> {
+    let date = today();
+    sqlx::query_as::<_, DailyReportRow>(
+        "SELECT game_type,
+                COUNT(*) AS rounds,
+                COALESCE(SUM(correct), 0) AS correct,
+                COALESCE(SUM(total), 0) AS total,
+                COALESCE(SUM(stars_earned), 0) AS stars
+         FROM GameRecord
+         WHERE profile_id = ?1 AND substr(played_at, 1, 10) = ?2
+         GROUP BY game_type
+         ORDER BY rounds DESC",
+    )
+    .bind(profile_id)
+    .bind(&date)
+    .fetch_all(state.inner())
+    .await
+    .map_err(|e| e.to_string())
+}
+
+fn game_display_name(code: &str) -> &'static str {
+    match code {
+        "fishing" => "数数捕鱼",
+        "compare" => "比较大小",
+        "orchard" => "加减法果园",
+        "shapes" => "图形配对",
+        "patterns" => "规律排序",
+        "clock" => "认时钟",
+        "multiply" => "乘除法·分苹果（试玩）",
+        _ => "未知游戏",
+    }
+}
+
+/// 生成今日 Markdown 报告并写入本地下载目录，返回文件路径（全程离线）
+#[tauri::command]
+pub async fn export_daily_report<R: tauri::Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, SqlitePool>,
+    profile_id: i64,
+) -> CmdResult<String> {
+    let date = today();
+    let profile: Profile = sqlx::query_as("SELECT * FROM Profile WHERE id = ?1")
+        .bind(profile_id)
+        .fetch_one(state.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let rows: Vec<DailyReportRow> =
+        sqlx::query_as(
+            "SELECT game_type,
+                    COUNT(*) AS rounds,
+                    COALESCE(SUM(correct), 0) AS correct,
+                    COALESCE(SUM(total), 0) AS total,
+                    COALESCE(SUM(stars_earned), 0) AS stars
+             FROM GameRecord
+             WHERE profile_id = ?1 AND substr(played_at, 1, 10) = ?2
+             GROUP BY game_type
+             ORDER BY rounds DESC",
+        )
+        .bind(profile_id)
+        .bind(&date)
+        .fetch_all(state.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let used_seconds: i64 = {
+        let row: Option<(i64,)> = sqlx::query_as(
+            "SELECT used_seconds FROM DailyUsage WHERE profile_id = ?1 AND date = ?2",
+        )
+        .bind(profile_id)
+        .bind(&date)
+        .fetch_optional(state.inner())
+        .await
+        .map_err(|e| e.to_string())?;
+        row.map(|r| r.0).unwrap_or(0)
+    };
+
+    let total_rounds: i64 = rows.iter().map(|r| r.rounds).sum();
+    let total_correct: i64 = rows.iter().map(|r| r.correct).sum();
+    let total_questions: i64 = rows.iter().map(|r| r.total).sum();
+    let total_stars: i64 = rows.iter().map(|r| r.stars).sum();
+    let accuracy = if total_questions > 0 {
+        (total_correct as f64 * 1000.0 / total_questions as f64).round() / 10.0
+    } else {
+        0.0
+    };
+    let minutes = used_seconds / 60;
+    let seconds = used_seconds % 60;
+
+    let mut md = String::new();
+    md.push_str(&format!("# KidMath 今日报告\n\n"));
+    md.push_str(&format!(
+        "- 小玩家：**{}**\n- 日期：{}\n- 今日游玩：{} 分 {} 秒\n- 总回合：{}　总星星：⭐{}\n- 综合正确率：{}%（一次答对 {}/{} 题）\n\n",
+        profile.nickname,
+        date,
+        minutes,
+        seconds,
+        total_rounds,
+        total_stars,
+        accuracy,
+        total_correct,
+        total_questions
+    ));
+    if rows.is_empty() {
+        md.push_str("今天还没有游戏记录。\n");
+    } else {
+        md.push_str("| 游戏 | 回合数 | 答对题数 | 总题数 | 正确率 | 星星 |\n");
+        md.push_str("| --- | ---: | ---: | ---: | ---: | ---: |\n");
+        for r in &rows {
+            let acc = if r.total > 0 {
+                format!("{:.0}%", r.correct as f64 * 100.0 / r.total as f64)
+            } else {
+                "—".to_string()
+            };
+            md.push_str(&format!(
+                "| {} | {} | {} | {} | {} | ⭐{} |\n",
+                game_display_name(&r.game_type),
+                r.rounds,
+                r.correct,
+                r.total,
+                acc,
+                r.stars
+            ));
+        }
+    }
+    md.push_str(&format!(
+        "\n---\n由 KidMath 自动生成，累计星星 ⭐{}。\n",
+        profile.stars_total
+    ));
+
+    let download_dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().document_dir())
+        .map_err(|e| format!("无法获取导出目录: {e}"))?;
+    std::fs::create_dir_all(&download_dir)
+        .map_err(|e| format!("无法创建导出目录: {e}"))?;
+    let safe_name: String = profile
+        .nickname
+        .chars()
+        .map(|c| if "\\/:*?\"<>|".contains(c) { '_' } else { c })
+        .collect();
+    let path = download_dir.join(format!("KidMath-{}-{}.md", safe_name, date));
+    std::fs::write(&path, md.as_bytes()).map_err(|e| format!("写入报告失败: {e}"))?;
+    Ok(path.to_string_lossy().to_string())
 }

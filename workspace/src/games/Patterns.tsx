@@ -77,12 +77,14 @@ export function buildQuestions(level: number): PatternQ[] {
 export default function Patterns({
   level,
   onDone,
+  onProgress,
 }: {
   level: number;
   onDone: (c: number, t: number) => void;
+  onProgress?: (p: import("./useRound").RoundProgress) => void;
 }) {
   const questions = useMemo(() => buildQuestions(level), [level]);
-  const { idx, correct, submit, total } = useRound(questions, onDone);
+  const { idx, correct, submit, total } = useRound(questions, onDone, onProgress);
   const q = questions[idx];
   const fb = useFeedback();
   const [filled, setFilled] = useState<Record<number, Key>>({});

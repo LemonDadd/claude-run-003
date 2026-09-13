@@ -4,12 +4,13 @@ import { useStore } from "../store/useStore";
 import {
   COMING_SOON,
   GAMES,
+  WIP_GAMES,
   ageFromBirthday,
   effectiveLevel,
 } from "../lib/gameConfig";
-import { AVATARS, ITEM_CATALOG } from "../lib/items";
 import { playClick } from "../lib/feedback";
 import { api } from "../lib/api";
+import OutfitAvatar from "../components/OutfitAvatar";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -35,53 +36,24 @@ export default function Home() {
   }, [profile]);
 
   if (!profile) return null;
-  const avatar = AVATARS.find((a) => a.id === profile.avatar);
   const age = ageFromBirthday(profile.birthday);
   const level = effectiveLevel(profile);
   const timeUp = remaining != null && remaining <= 0;
-
-  const wornHat = ITEM_CATALOG.find((i) => i.code === profile.outfit_hat)?.emoji;
-  const wornGlasses = ITEM_CATALOG.find((i) => i.code === profile.outfit_glasses)?.emoji;
-  const wornBg = ITEM_CATALOG.find((i) => i.code === profile.outfit_background)?.emoji;
-  const wornPet = ITEM_CATALOG.find((i) => i.code === profile.outfit_pet)?.emoji;
 
   const mm = remaining == null ? "" : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`;
 
   return (
     <div className="page">
       <div className="home-header">
-        <div
-          style={{
-            position: "relative",
-            width: 86,
-            height: 86,
-            borderRadius: "50%",
-            background: "#fef3c7",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 56,
-            flexShrink: 0,
+        <OutfitAvatar
+          avatarId={profile.avatar}
+          outfit={{
+            hat: profile.outfit_hat ?? null,
+            glasses: profile.outfit_glasses ?? null,
+            background: profile.outfit_background ?? null,
+            pet: profile.outfit_pet ?? null,
           }}
-        >
-          {wornBg && (
-            <span style={{ position: "absolute", fontSize: 30, right: -6, bottom: -6 }}>
-              {wornBg}
-            </span>
-          )}
-          <span>{avatar?.emoji ?? "🧒"}</span>
-          {wornHat && (
-            <span style={{ position: "absolute", fontSize: 30, top: -14 }}>{wornHat}</span>
-          )}
-          {wornGlasses && (
-            <span style={{ position: "absolute", fontSize: 24, top: 30 }}>{wornGlasses}</span>
-          )}
-          {wornPet && (
-            <span style={{ position: "absolute", fontSize: 30, left: -18, bottom: -4 }}>
-              {wornPet}
-            </span>
-          )}
-        </div>
+        />
         <div className="who" style={{ flex: 1 }}>
           <h2>{profile.nickname}</h2>
           <span>
@@ -153,6 +125,25 @@ export default function Home() {
 
         <div className="soon-row">
           <span className="soon-label">即将推出：</span>
+          {WIP_GAMES.map((g) => (
+            <button
+              key={g.type}
+              className="soon-tag soon-playable"
+              style={{
+                border: "3px dashed #f472b6",
+                background: "#fdf2f8",
+                color: "#be185d",
+                cursor: "pointer",
+              }}
+              onClick={() => {
+                if (timeUp) return;
+                playClick();
+                navigate(`/game/${g.type}`);
+              }}
+            >
+              {g.emoji} {g.name} · 可试玩
+            </button>
+          ))}
           {COMING_SOON.map((t) => (
             <span key={t} className="soon-tag">
               {t}

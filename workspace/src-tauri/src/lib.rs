@@ -43,6 +43,9 @@ pub fn run() {
             // 每日时长
             add_play_seconds,
             get_today_usage,
+            // 今日报告
+            get_daily_report,
+            export_daily_report,
         ])
         .run(tauri::generate_context!())
         .expect("启动 KidMath 失败");

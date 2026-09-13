@@ -9,6 +9,7 @@ import type {
 import { api } from "../lib/api";
 import { ACHIEVEMENTS, effectiveLevel } from "../lib/gameConfig";
 import { itemsEarnedByStars } from "../lib/items";
+import { evaluateAchievements } from "../lib/achievements";
 
 interface AppState {
   profiles: Profile[];
@@ -44,6 +45,13 @@ interface AppState {
 
   /** 游戏结束：保存记录、刷星星、检查成就与饰品 */
   finishRound: (r: RoundResult) => Promise<{ starsTotal: number }>;
+  /** 到限/中断：把已作答的部分回合落库（不评星、不进奖励页） */
+  savePartialRound: (input: {
+    gameType: import("../types").GameType;
+    level: number;
+    answered: number;
+    correct: number;
+  }) => Promise<void>;
   refreshProfileData: () => Promise<void>;
   equip: (slot: "hat" | "glasses" | "background" | "pet", code: string | null) => Promise<void>;
 }
@@ -176,22 +184,25 @@ export const useStore = create<AppState>((set, get) => ({
       stars_earned: r.stars,
     });
 
-    // 刷新统计后再判定成就
+    // 刷新统计
     await get().refreshProfileData();
     const { stats, records, items } = get();
 
-    // ---------- 成就判定（前端计算，后端幂等解锁） ----------
-    const codes = new Set<string>();
-    codes.add("first_round");
-    if ((stats?.rounds ?? 0) >= 10) codes.add("rounds_10");
-    if ((stats?.total_correct ?? 0) >= 50) codes.add("correct_50");
-    if ((stats?.played_games ?? 0) >= 6) codes.add("all_games");
-    if (r.correct === r.total) codes.add("perfect_game");
-    // 连续 3 天：看最近记录日期
-    const days = new Set(
-      records.slice(0, 30).map((rec) => rec.played_at.slice(0, 10))
-    );
-    if (hasThreeDayStreak([...days])) codes.add("streak_3days");
+    // ---------- 饰品：按最新总星星同步 ----------
+    const starsTotal = saved.stars_total;
+    const expected = itemsEarnedByStars(starsTotal).map((i) => i.code);
+    const newItemCodes = await api.syncItems(profile.id, expected);
+    const already = new Set(items?.unlocked.map((u) => u.item_code) ?? []);
+    const brandNew = newItemCodes.filter((c) => !already.has(c));
+
+    // ---------- 成就判定（含解锁 5 个饰品，需在饰品同步之后） ----------
+    const unlockedItemCount = (items?.unlocked.length ?? 0) + brandNew.length;
+    const codes = evaluateAchievements({
+      stats: stats ?? { rounds: 0, total_correct: 0, total_answered: 0, played_games: 0 },
+      round: { correct: r.correct, total: r.total },
+      playDates: records.slice(0, 30).map((rec) => rec.played_at.slice(0, 10)),
+      unlockedItemCount,
+    });
 
     const newlyUnlocked: AchievementDef[] = [];
     for (const code of codes) {
@@ -202,13 +213,6 @@ export const useStore = create<AppState>((set, get) => ({
       }
     }
 
-    // ---------- 饰品：按最新总星星同步 ----------
-    const starsTotal = saved.stars_total;
-    const expected = itemsEarnedByStars(starsTotal).map((i) => i.code);
-    const newItemCodes = await api.syncItems(profile.id, expected);
-    const already = new Set(items?.unlocked.map((u) => u.item_code) ?? []);
-    const brandNew = newItemCodes.filter((c) => !already.has(c));
-
     await get().refreshProfileData();
     set({
       lastRound: r,
@@ -216,6 +220,20 @@ export const useStore = create<AppState>((set, get) => ({
       newItems: brandNew,
     });
     return { starsTotal };
+  },
+
+  savePartialRound: async ({ gameType, level, answered, correct }) => {
+    const profile = get().activeProfile;
+    if (!profile || answered <= 0) return;
+    // 到限中断：记录答题进度供家长查看，但不计星、不触发回合类成就
+    await api.saveResult({
+      profile_id: profile.id,
+      game_type: gameType,
+      level,
+      correct,
+      total: answered,
+      stars_earned: 0,
+    });
   },
 
   equip: async (slot, code) => {
@@ -232,27 +250,3 @@ export const useStore = create<AppState>((set, get) => ({
     await get().refreshProfileData();
   },
 }));
-
-/** 判断日期集合中是否存在连续 3 天（含今天，按本地日期） */
-function hasThreeDayStreak(days: string[]): boolean {
-  if (days.length < 3) return false;
-  const set = new Set(days);
-  const localDate = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate()
-    ).padStart(2, "0")}`;
-  const today = new Date();
-  for (let offset = 0; offset <= 2; offset++) {
-    let ok = true;
-    for (let back = 0; back < 3; back++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - offset - back);
-      if (!set.has(localDate(d))) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) return true;
-  }
-  return false;
-}
