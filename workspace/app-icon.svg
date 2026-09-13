@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb347"/>
+      <stop offset="1" stop-color="#ff7a1a"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" rx="220" ry="220" fill="url(#bg)"/>
+
+  <!-- 白色圆底 -->
+  <circle cx="512" cy="500" r="310" fill="#ffffff"/>
+
+  <!-- 数字 1：青色圆棒 -->
+  <rect x="268" y="380" width="70" height="240" rx="35" fill="#0ea5e9"/>
+
+  <!-- 加号 -->
+  <rect x="402" y="462" width="120" height="40" rx="20" fill="#f59e0b"/>
+  <rect x="442" y="422" width="40" height="120" rx="20" fill="#f59e0b"/>
+
+  <!-- 数字 2：绿色三段 -->
+  <path d="M588 380 h150 a35 35 0 0 1 35 35 v55 a35 35 0 0 1 -35 35 h-115 l150 105 a35 35 0 0 1 -20 65 h-165"
+        fill="none" stroke="#22c55e" stroke-width="66" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 三颗小星星 -->
+  <polygon points="215,210 237,272 303,272 250,312 269,377 215,338 161,377 180,312 127,272 193,272"
+           fill="#fde68a" stroke="#f59e0b" stroke-width="10"/>
+  <polygon points="830,180 846,228 898,228 856,259 871,310 830,280 789,310 804,259 762,228 814,228"
+           fill="#fde68a" stroke="#f59e0b" stroke-width="10"/>
+  <polygon points="850,770 866,818 918,818 876,849 891,900 850,870 809,900 824,849 782,818 834,818"
+           fill="#fff7cc" stroke="#f59e0b" stroke-width="10"/>
+
+  <!-- 底部小装饰点（暗示更多数学乐趣） -->
+  <circle cx="350" cy="880" r="26" fill="#ffffff" opacity="0.9"/>
+  <circle cx="512" cy="880" r="26" fill="#ffffff" opacity="0.9"/>
+  <circle cx="674" cy="880" r="26" fill="#ffffff" opacity="0.9"/>
+</svg>

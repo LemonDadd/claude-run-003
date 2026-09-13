@@ -1,0 +1,31 @@
+[package]
+name = "kidmath"
+version = "1.0.0"
+description = "KidMath 儿童数学启蒙游戏"
+authors = ["KidMath"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "kidmath_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+hex = "0.4"
+chrono = "0.4"
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros"] }
+tokio = { version = "1", features = ["sync", "macros", "rt"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

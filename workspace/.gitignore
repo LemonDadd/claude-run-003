@@ -1,0 +1,11 @@
+node_modules
+dist
+src-tauri/target
+src-tauri/gen
+app-icon.png
+.DS_Store
+*.log
+
+# Crash dumps (do not commit)
+core
+*.core
